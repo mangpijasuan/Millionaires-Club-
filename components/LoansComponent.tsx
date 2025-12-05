@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Member, Loan, Transaction } from '../types';
-import { AlertCircle, CheckCircle, CreditCard, X, DollarSign, Clock, Calendar, Printer, History, Search, ChevronDown, Check, UserPlus, AlertTriangle, FileText } from 'lucide-react';
+import { AlertCircle, CheckCircle, CreditCard, X, DollarSign, Clock, Calendar, Printer, History, Search, ChevronDown, Check, UserPlus, AlertTriangle, FileText, Wallet } from 'lucide-react';
 
 interface LoansProps {
   members: Member[];
@@ -18,6 +18,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
   const [cosignerId, setCosignerId] = useState('');
   const [loanAmount, setLoanAmount] = useState('');
   const [term, setTerm] = useState(12);
+  const [feeType, setFeeType] = useState<'upfront' | 'capitalized'>('upfront');
 
   // Searchable Dropdown State for Borrower
   const [borrowerSearch, setBorrowerSearch] = useState('');
@@ -112,14 +113,20 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
       return;
     }
 
-    const amount = parseFloat(loanAmount);
-    if (isNaN(amount) || amount > (eligibility.limit || 0)) {
+    const requestedAmount = parseFloat(loanAmount);
+    if (isNaN(requestedAmount) || requestedAmount > (eligibility.limit || 0)) {
        notify("Invalid amount or exceeds limit.", "error");
        return;
     }
 
     // Calculate Application Fee
-    const appFee = calculateApplicationFee(amount, term);
+    const appFee = calculateApplicationFee(requestedAmount, term);
+
+    // Determine Final Loan Principal based on Fee Type
+    let finalPrincipal = requestedAmount;
+    if (feeType === 'capitalized') {
+        finalPrincipal += appFee;
+    }
 
     // Calculate first due date: 10th of the next month
     const now = new Date();
@@ -129,8 +136,8 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
       id: Math.random().toString(36).substr(2, 9),
       borrowerId,
       cosignerId: cosignerId,
-      originalAmount: amount,
-      remainingBalance: amount,
+      originalAmount: finalPrincipal,
+      remainingBalance: finalPrincipal,
       termMonths: term,
       status: 'ACTIVE',
       startDate: new Date().toISOString(),
@@ -146,7 +153,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
             id: Math.random().toString(36).substr(2, 9), 
             memberId: borrowerId, 
             type: 'LOAN_DISBURSAL' as const, 
-            amount: amount, 
+            amount: requestedAmount, 
             date: new Date().toISOString(), 
             description: 'Loan Disbursal' 
         },
@@ -156,18 +163,25 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
             type: 'FEE' as const,
             amount: appFee,
             date: new Date().toISOString(),
-            description: `Application Fee (${term} Mo)`
+            description: feeType === 'capitalized' 
+                ? `Application Fee (${term} Mo) - Added to Principal` 
+                : `Application Fee (${term} Mo) - Paid Upfront`
         },
         ...transactions
     ];
     setTransactions(newTransactions);
     
-    notify(`Loan issued successfully! Application Fee of $${appFee} recorded.`);
+    const successMsg = feeType === 'capitalized' 
+        ? `Loan issued! $${appFee} fee added to principal.` 
+        : `Loan issued! Please collect $${appFee} fee upfront.`;
+    
+    notify(successMsg);
     setBorrowerId('');
     setBorrowerSearch('');
     setCosignerId('');
     setCosignerSearch('');
     setLoanAmount('');
+    setFeeType('upfront');
   };
 
   const handleRepaySubmit = (e: React.FormEvent) => {
@@ -668,9 +682,51 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
             </div>
 
             {loanAmount && !isNaN(parseFloat(loanAmount)) && (
-                <div className="bg-blue-50 p-3 rounded-xl text-xs text-blue-800 border border-blue-100 flex items-center justify-between">
-                    <span>Application Fee (Policy 2024):</span>
-                    <span className="font-bold text-lg">${calculateApplicationFee(parseFloat(loanAmount), term)}</span>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div className="flex justify-between items-center text-sm mb-2">
+                        <span className="text-slate-600 font-medium">Application Fee:</span>
+                        <span className="font-bold text-slate-800">${calculateApplicationFee(parseFloat(loanAmount), term)}</span>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 mb-3">
+                        <label className="flex items-center gap-3 p-2 border border-slate-200 rounded-lg cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                                type="radio" 
+                                name="feeType" 
+                                value="upfront" 
+                                checked={feeType === 'upfront'} 
+                                onChange={() => setFeeType('upfront')}
+                                className="text-blue-600 focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                                <span className="text-sm font-bold text-slate-700 block">Pay Upfront</span>
+                                <span className="text-[10px] text-slate-500">Collect fee via cash/check now</span>
+                            </div>
+                            <Wallet size={16} className="text-slate-400"/>
+                        </label>
+                        <label className="flex items-center gap-3 p-2 border border-slate-200 rounded-lg cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                                type="radio" 
+                                name="feeType" 
+                                value="capitalized" 
+                                checked={feeType === 'capitalized'} 
+                                onChange={() => setFeeType('capitalized')}
+                                className="text-blue-600 focus:ring-blue-500"
+                            />
+                            <div className="flex-1">
+                                <span className="text-sm font-bold text-slate-700 block">Add to Principal</span>
+                                <span className="text-[10px] text-slate-500">Roll fee into loan balance</span>
+                            </div>
+                            <FileText size={16} className="text-slate-400"/>
+                        </label>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center">
+                        <span className="text-xs font-bold text-blue-600 uppercase">Monthly Payment</span>
+                        <span className="text-lg font-bold text-blue-700">
+                            ${((parseFloat(loanAmount) + (feeType === 'capitalized' ? calculateApplicationFee(parseFloat(loanAmount), term) : 0)) / term).toFixed(2)}
+                        </span>
+                    </div>
                 </div>
             )}
 

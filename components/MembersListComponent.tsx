@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Member } from '../types';
-import { Search, Plus, UserCheck, MoreVertical, Upload, Filter, X } from 'lucide-react';
+import { Search, Plus, UserCheck, MoreVertical, Upload, Filter, X, Trash2 } from 'lucide-react';
 
 interface MembersListProps {
   members: Member[];
   setEditingMember: (member: Member) => void;
   handleAddMember: (e: React.FormEvent) => void;
+  handleDeleteMember: (id: string) => void;
   setShowBatchUpload: (show: boolean) => void;
 }
 
-const MembersListComponent: React.FC<MembersListProps> = ({ members, setEditingMember, handleAddMember, setShowBatchUpload }) => {
+const MembersListComponent: React.FC<MembersListProps> = ({ members, setEditingMember, handleAddMember, handleDeleteMember, setShowBatchUpload }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   
@@ -183,12 +184,22 @@ const MembersListComponent: React.FC<MembersListProps> = ({ members, setEditingM
                   </td>
                   <td className="px-6 py-4 text-slate-500">{member.joinDate}</td>
                   <td className="px-6 py-4 text-right">
-                    <button 
-                      onClick={() => setEditingMember(member)}
-                      className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700 transition-colors"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
+                    <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => setEditingMember(member)}
+                          className="p-2 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700 transition-colors"
+                          title="Edit Member"
+                        >
+                          <MoreVertical size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteMember(member.id)}
+                          className="p-2 hover:bg-red-50 rounded-full text-slate-400 hover:text-red-600 transition-colors"
+                          title="Delete Member"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                    </div>
                   </td>
                 </tr>
               ))}
