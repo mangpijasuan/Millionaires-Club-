@@ -57,8 +57,7 @@ const MemberPortal: React.FC<MemberPortalProps> = ({
     setIsEditing(true);
   };
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = () => {
     const updatedMember = { ...member, ...editForm };
     setMember(updatedMember); // Update local view immediately
     onUpdateProfile(updatedMember); // Persist to App state/storage
