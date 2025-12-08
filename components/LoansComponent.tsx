@@ -539,16 +539,16 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                         <div className="grid grid-cols-2 gap-8 mb-6">
                             <div>
                                 <div className="bg-slate-500 text-white px-2 py-1 font-bold text-sm">Loan Information</div>
-                                <div className="border border-slate-300">
-                                    <div className="flex justify-between p-2 border-b border-slate-200 text-sm">
+                                <div className={`border ${isDark ? 'border-slate-600' : 'border-slate-300'}`}>
+                                    <div className={`flex justify-between p-2 border-b ${isDark ? 'border-slate-600' : 'border-slate-200'} text-sm`}>
                                         <span className="font-bold">Loan Period In Months</span>
                                         <span className="font-mono">{scheduleLoan.termMonths}</span>
                                     </div>
-                                    <div className="flex justify-between p-2 border-b border-slate-200 text-sm">
+                                    <div className={`flex justify-between p-2 border-b ${isDark ? 'border-slate-600' : 'border-slate-200'} text-sm`}>
                                         <span className="font-bold">Loan Issue Date</span>
                                         <span className="font-mono">{new Date(scheduleLoan.startDate).toLocaleDateString()}</span>
                                     </div>
-                                    <div className="flex justify-between p-2 text-sm bg-white">
+                                    <div className={`flex justify-between p-2 text-sm ${bgHeader}`}>
                                         <span className="font-bold">Loan Amount:</span>
                                         <span className="font-mono font-bold">${scheduleLoan.originalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                                     </div>
@@ -556,7 +556,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                             </div>
                             <div>
                                 <div className="bg-slate-500 text-white px-2 py-1 font-bold text-sm">Summary To Date</div>
-                                <div className="border border-slate-300 bg-slate-100">
+                                <div className={`border ${isDark ? 'border-slate-600' : 'border-slate-300'} ${bgHeader}`}>
                                     <div className="flex justify-between p-2 border-b border-slate-300 text-sm">
                                         <span className="font-bold">Total Payment</span>
                                         <span className="font-mono">${totalPaid.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
@@ -572,7 +572,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                                 </div>
                             </div>
                         </div>
-                        <h4 className="text-lg font-bold text-slate-800 mb-2 border-b-2 border-blue-400 pb-1 inline-block">Payment Schedules</h4>
+                        <h4 className={`text-lg font-bold ${textPrimary} mb-2 border-b-2 border-blue-400 pb-1 inline-block`}>Payment Schedules</h4>
                         <table className="w-full text-sm border-collapse">
                             <thead>
                                 <tr className="bg-blue-500 text-white print:bg-blue-500">
@@ -584,7 +584,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                             </thead>
                             <tbody>
                                 {schedule.map((row, idx) => (
-                                    <tr key={row.number} className={idx % 2 === 0 ? 'bg-blue-50/30' : 'bg-white'}>
+                                    <tr key={row.number} className={idx % 2 === 0 ? (isDark ? 'bg-blue-950/20' : 'bg-blue-50/30') : ''}>
                                         <td className="p-2 border border-blue-100">Pmt # {row.number}</td>
                                         <td className="p-2 border border-blue-100">{row.dueDate.toLocaleDateString()}</td>
                                         <td className="p-2 border border-blue-100 text-right font-mono">${row.estimated.toFixed(2)}</td>
@@ -823,10 +823,10 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Amount</label>
+              <label className={`block text-xs font-bold ${textSecondary} uppercase mb-1`}>Amount</label>
               <input 
                 type="number" 
-                className="w-full p-3 border border-slate-200 rounded-xl"
+                className={`${inputClass} w-full p-3 border rounded-xl`}
                 value={loanAmount} 
                 onChange={e => setLoanAmount(e.target.value)}
                 placeholder="0.00"
@@ -880,7 +880,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                     </div>
                     
                     <div className="flex flex-col gap-2 mb-3">
-                        <label className="flex items-center gap-3 p-2 border border-slate-200 rounded-lg cursor-pointer hover:bg-white transition-colors">
+                        <label className={`flex items-center gap-3 p-2 border ${isDark ? 'border-slate-700 hover:bg-slate-700' : 'border-slate-200 hover:bg-white'} rounded-lg cursor-pointer transition-colors`}>
                             <input 
                                 type="radio" 
                                 name="feeType" 
