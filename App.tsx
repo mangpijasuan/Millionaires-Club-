@@ -5,12 +5,14 @@ import {
   Search, Filter, Save, ChevronRight, Download, Upload, PieChart,
   TrendingUp, BarChart3, Clock, Settings, Shield, LogOut, Bell,
   Activity, Sparkles, Loader, Lock, Key, Heart, Printer, Calculator, Menu,
-  ShieldCheck, ArrowRight, DollarSign, CreditCard, RefreshCw
+  ShieldCheck, ArrowRight, DollarSign, CreditCard, RefreshCw, Sun, Moon
 } from 'lucide-react';
 import { Member, Loan, Transaction, CommunicationLog, YearlyContribution } from './types';
 import { CONTRIBUTIONS_DB, INITIAL_MEMBERS, CONTRIBUTION_HISTORY_DB } from './constants';
 import { callGemini } from './services/geminiService';
 import { StorageService, STORAGE_KEYS } from './services/storageService';
+import { useTheme } from './contexts/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
 
 // Sub-components
 import DashboardComponent from './components/DashboardComponent';
@@ -52,24 +54,45 @@ const NavItem = ({ id, icon, label, activeTab, setActiveTab }: any) => (
 
 // --- Extracted Components ---
 
-const LandingPage = ({ setViewMode }: { setViewMode: (mode: any) => void }) => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+const LandingPage = ({ setViewMode, isDark, toggleTheme }: { setViewMode: (mode: any) => void, isDark: boolean, toggleTheme: () => void }) => (
+  <div className={`min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden transition-colors duration-300 ${
+    isDark 
+      ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900' 
+      : 'bg-gradient-to-br from-slate-100 via-white to-slate-100'
+  }`}>
+      {/* Theme Toggle */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-6 right-6 p-3 rounded-xl transition-all duration-300 z-20 ${
+          isDark 
+            ? 'bg-white/10 hover:bg-white/20 text-yellow-400' 
+            : 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+        }`}
+        title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {isDark ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+
       {/* Background decoration */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-          <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[100px]"></div>
-          <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[100px]"></div>
+          <div className={`absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[100px] ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-500/20'}`}></div>
+          <div className={`absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full blur-[100px] ${isDark ? 'bg-blue-500/10' : 'bg-blue-500/20'}`}></div>
       </div>
 
       <div className="relative z-10 w-full max-w-4xl text-center">
-          <div className="inline-flex items-center justify-center p-4 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 mb-8 shadow-2xl">
+          <div className={`inline-flex items-center justify-center p-4 backdrop-blur-sm rounded-2xl mb-8 shadow-2xl ${
+            isDark 
+              ? 'bg-white/5 border border-white/10' 
+              : 'bg-white border border-slate-200'
+          }`}>
               <div className="p-3 bg-emerald-500 rounded-xl mr-4 text-white shadow-lg shadow-emerald-500/20">
                   <Users size={32} />
               </div>
               <div className="text-left">
-                  <h1 className="text-3xl font-bold text-white tracking-tight">Millionaires Club</h1>
+                  <h1 className={`text-3xl font-bold tracking-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>Millionaires Club</h1>
                   <div className="flex items-center gap-2">
-                    <p className="text-emerald-400 text-sm font-medium tracking-wider uppercase">Financial Services</p>
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-white/60 font-mono">v2.0</span>
+                    <p className="text-emerald-500 text-sm font-medium tracking-wider uppercase">Financial Services</p>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono ${isDark ? 'bg-white/10 text-white/60' : 'bg-slate-100 text-slate-500'}`}>v2.0</span>
                   </div>
               </div>
           </div>
@@ -78,17 +101,21 @@ const LandingPage = ({ setViewMode }: { setViewMode: (mode: any) => void }) => (
               {/* Admin Card */}
               <div 
                   onClick={() => setViewMode('admin_login')}
-                  className="group bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 hover:border-emerald-500/50 p-8 rounded-3xl cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/20 text-left relative overflow-hidden"
+                  className={`group backdrop-blur-md p-8 rounded-3xl cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 text-left relative overflow-hidden ${
+                    isDark 
+                      ? 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-900/20' 
+                      : 'bg-white hover:bg-slate-50 border border-slate-200 hover:border-emerald-500 shadow-lg hover:shadow-xl'
+                  }`}
               >
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${isDark ? 'text-white' : 'text-slate-400'}`}>
                       <LayoutDashboard size={120} />
                   </div>
-                  <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 mb-6 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                  <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-500 mb-6 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
                       <ShieldCheck size={24} />
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Admin Workspace</h2>
-                  <p className="text-slate-400 mb-6 text-sm leading-relaxed">Manage members, track loans, record contributions, and generate financial reports.</p>
-                  <div className="flex items-center text-emerald-400 font-bold text-sm group-hover:text-white transition-colors">
+                  <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>Admin Workspace</h2>
+                  <p className={`mb-6 text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Manage members, track loans, record contributions, and generate financial reports.</p>
+                  <div className="flex items-center text-emerald-500 font-bold text-sm group-hover:text-emerald-600 transition-colors">
                       Enter Workspace <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
                   </div>
               </div>
@@ -96,72 +123,89 @@ const LandingPage = ({ setViewMode }: { setViewMode: (mode: any) => void }) => (
               {/* Member Card */}
               <div 
                   onClick={() => setViewMode('member_login')}
-                  className="group bg-white/5 hover:bg-white/10 backdrop-blur-md border border-white/10 hover:border-blue-500/50 p-8 rounded-3xl cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-blue-900/20 text-left relative overflow-hidden"
+                  className={`group backdrop-blur-md p-8 rounded-3xl cursor-pointer transition-all duration-300 hover:transform hover:-translate-y-1 text-left relative overflow-hidden ${
+                    isDark 
+                      ? 'bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-900/20' 
+                      : 'bg-white hover:bg-slate-50 border border-slate-200 hover:border-blue-500 shadow-lg hover:shadow-xl'
+                  }`}
               >
-                  <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${isDark ? 'text-white' : 'text-slate-400'}`}>
                       <Users size={120} />
                   </div>
-                  <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-400 mb-6 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                  <div className="w-12 h-12 bg-blue-500/20 rounded-2xl flex items-center justify-center text-blue-500 mb-6 group-hover:bg-blue-500 group-hover:text-white transition-colors">
                       <UserCheck size={24} />
                   </div>
-                  <h2 className="text-2xl font-bold text-white mb-2">Member Portal</h2>
-                  <p className="text-slate-400 mb-6 text-sm leading-relaxed">View your personal contribution history, check loan status, and download statements.</p>
-                  <div className="flex items-center text-blue-400 font-bold text-sm group-hover:text-white transition-colors">
+                  <h2 className={`text-2xl font-bold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>Member Portal</h2>
+                  <p className={`mb-6 text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>View your personal contribution history, check loan status, and download statements.</p>
+                  <div className="flex items-center text-blue-500 font-bold text-sm group-hover:text-blue-600 transition-colors">
                       Access Portal <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
                   </div>
               </div>
           </div>
 
-          <div className="mt-12 text-slate-500 text-xs">
+          <div className={`mt-12 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               &copy; {new Date().getFullYear()} Millionaires Club Financial Services. All rights reserved.
           </div>
       </div>
   </div>
 );
 
-const AdminLoginPage = ({ onLogin, setViewMode }: { onLogin: (e: React.FormEvent) => void, setViewMode: (mode: any) => void }) => (
-  <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in-95">
+const AdminLoginPage = ({ onLogin, setViewMode, isDark, toggleTheme }: { onLogin: (e: React.FormEvent) => void, setViewMode: (mode: any) => void, isDark: boolean, toggleTheme: () => void }) => (
+  <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
+      {/* Theme Toggle */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-6 right-6 p-3 rounded-xl transition-all duration-300 z-20 ${
+          isDark 
+            ? 'bg-white/10 hover:bg-white/20 text-yellow-400' 
+            : 'bg-white hover:bg-slate-200 text-slate-700 shadow'
+        }`}
+        title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {isDark ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+      
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in-95 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
           <div className="text-center mb-8">
-              <div className="inline-flex p-3 bg-slate-100 text-slate-700 rounded-full mb-4">
+              <div className={`inline-flex p-3 rounded-full mb-4 ${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-700'}`}>
                   <LayoutDashboard size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Admin Workspace</h2>
-              <p className="text-slate-500 text-sm mt-2">Secure access for fund managers.</p>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Admin Workspace</h2>
+              <p className={`text-sm mt-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Secure access for fund managers.</p>
           </div>
 
           <form onSubmit={onLogin} className="space-y-5">
               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                  <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Email</label>
                   <div className="relative">
-                      <Shield className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                      <Shield className={`absolute left-3 top-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} size={18} />
                       <input 
                         type="email"
                         defaultValue="admin@millionairesclub.com"
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none" 
+                        className={`w-full pl-10 pr-4 py-3 rounded-lg focus:ring-2 outline-none ${isDark ? 'bg-slate-700 border-slate-600 text-white focus:ring-emerald-500' : 'border border-slate-200 focus:ring-slate-500'}`}
                         required 
                       />
                   </div>
               </div>
               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Password</label>
+                  <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Password</label>
                   <div className="relative">
-                      <Lock className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                      <Lock className={`absolute left-3 top-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} size={18} />
                       <input 
                         type="password"
                         defaultValue="password"
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-slate-500 outline-none" 
+                        className={`w-full pl-10 pr-4 py-3 rounded-lg focus:ring-2 outline-none ${isDark ? 'bg-slate-700 border-slate-600 text-white focus:ring-emerald-500' : 'border border-slate-200 focus:ring-slate-500'}`}
                         required 
                       />
                   </div>
               </div>
-              <button type="submit" className="w-full bg-slate-800 text-white py-3.5 rounded-lg font-bold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 mt-2">
+              <button type="submit" className={`w-full py-3.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2 mt-2 ${isDark ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-800 text-white hover:bg-slate-700'}`}>
                   Enter Workspace <ArrowRight size={16} />
               </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-              <button onClick={() => setViewMode('landing')} className="text-xs text-slate-400 hover:text-slate-600 underline">
+          <div className={`mt-8 pt-6 text-center ${isDark ? 'border-t border-slate-700' : 'border-t border-slate-100'}`}>
+              <button onClick={() => setViewMode('landing')} className={`text-xs underline ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
                   Back to Home
               </button>
           </div>
@@ -169,15 +213,28 @@ const AdminLoginPage = ({ onLogin, setViewMode }: { onLogin: (e: React.FormEvent
   </div>
 );
 
-const MemberLoginScreen = ({ onLogin, loginError, setViewMode }: { onLogin: (e: React.FormEvent) => void, loginError: string, setViewMode: (mode: any) => void }) => (
-  <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in-95">
+const MemberLoginScreen = ({ onLogin, loginError, setViewMode, isDark, toggleTheme }: { onLogin: (e: React.FormEvent) => void, loginError: string, setViewMode: (mode: any) => void, isDark: boolean, toggleTheme: () => void }) => (
+  <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${isDark ? 'bg-slate-900' : 'bg-slate-100'}`}>
+      {/* Theme Toggle */}
+      <button
+        onClick={toggleTheme}
+        className={`absolute top-6 right-6 p-3 rounded-xl transition-all duration-300 z-20 ${
+          isDark 
+            ? 'bg-white/10 hover:bg-white/20 text-yellow-400' 
+            : 'bg-white hover:bg-slate-200 text-slate-700 shadow'
+        }`}
+        title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+      >
+        {isDark ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+      
+      <div className={`w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 animate-in fade-in zoom-in-95 ${isDark ? 'bg-slate-800' : 'bg-white'}`}>
           <div className="text-center mb-8">
-              <div className="inline-flex p-3 bg-blue-100 text-blue-600 rounded-full mb-4">
+              <div className={`inline-flex p-3 rounded-full mb-4 ${isDark ? 'bg-blue-900/50 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
                   <Users size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-800">Member Portal</h2>
-              <p className="text-slate-500 text-sm mt-2">Access your fund records securely.</p>
+              <h2 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Member Portal</h2>
+              <p className={`text-sm mt-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Access your fund records securely.</p>
           </div>
 
           {loginError && (
@@ -188,13 +245,13 @@ const MemberLoginScreen = ({ onLogin, loginError, setViewMode }: { onLogin: (e: 
 
           <form onSubmit={onLogin} className="space-y-5">
               <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Member ID</label>
+                  <label className={`block text-xs font-bold uppercase mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Member ID</label>
                   <div className="relative">
-                      <UserCheck className="absolute left-3 top-2.5 text-slate-400" size={18} />
+                      <UserCheck className={`absolute left-3 top-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} size={18} />
                       <input 
                         name="memberId" 
                         placeholder="e.g. MC-000001" 
-                        className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" 
+                        className={`w-full pl-10 pr-4 py-3 rounded-lg focus:ring-2 outline-none ${isDark ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-500 focus:ring-blue-500' : 'border border-slate-200 focus:ring-blue-500'}`}
                         required 
                       />
                   </div>
@@ -204,8 +261,8 @@ const MemberLoginScreen = ({ onLogin, loginError, setViewMode }: { onLogin: (e: 
               </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-              <button onClick={() => setViewMode('landing')} className="text-xs text-slate-400 hover:text-slate-600 underline">
+          <div className={`mt-8 pt-6 text-center ${isDark ? 'border-t border-slate-700' : 'border-t border-slate-100'}`}>
+              <button onClick={() => setViewMode('landing')} className={`text-xs underline ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
                   Back to Home
               </button>
           </div>
@@ -214,6 +271,7 @@ const MemberLoginScreen = ({ onLogin, loginError, setViewMode }: { onLogin: (e: 
 );
 
 export default function App() {
+  const { isDark, toggleTheme } = useTheme();
   const [viewMode, setViewMode] = useState<'landing' | 'admin_login' | 'admin_dashboard' | 'member_login' | 'member_portal'>('landing');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [notifications, setNotifications] = useState<{id: number, message: string, type: 'success' | 'error' | 'info'}[]>([]);
@@ -1264,15 +1322,15 @@ export default function App() {
   // --- RENDER LOGIC ---
 
   if (viewMode === 'landing') {
-      return <LandingPage setViewMode={setViewMode} />;
+      return <LandingPage setViewMode={setViewMode} isDark={isDark} toggleTheme={toggleTheme} />;
   }
 
   if (viewMode === 'admin_login') {
-      return <AdminLoginPage onLogin={handleAdminLogin} setViewMode={setViewMode} />;
+      return <AdminLoginPage onLogin={handleAdminLogin} setViewMode={setViewMode} isDark={isDark} toggleTheme={toggleTheme} />;
   }
 
   if (viewMode === 'member_login') {
-      return <MemberLoginScreen onLogin={handleMemberLogin} loginError={loginError} setViewMode={setViewMode} />;
+      return <MemberLoginScreen onLogin={handleMemberLogin} loginError={loginError} setViewMode={setViewMode} isDark={isDark} toggleTheme={toggleTheme} />;
   }
 
   if (viewMode === 'member_portal' && currentMemberUser) {
