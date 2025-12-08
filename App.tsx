@@ -633,6 +633,10 @@ export default function App() {
                                 <input name="phone" type="tel" defaultValue={editingMember.phone} className="w-full p-2 border rounded" placeholder="Phone"/>
                             </div>
                             <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500">Mailing Address</label>
+                                <input name="address" defaultValue={editingMember.address} className="w-full p-2 border rounded" placeholder="Mailing Address"/>
+                            </div>
+                            <div className="space-y-1">
                                 <label className="text-xs font-bold text-slate-500">Beneficiary</label>
                                 <input name="beneficiary" defaultValue={editingMember.beneficiary} className="w-full p-2 border rounded" placeholder="Beneficiary"/>
                             </div>
@@ -655,6 +659,43 @@ export default function App() {
                              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
                                 <p className="text-xs uppercase font-bold text-slate-500">Join Date</p>
                                 <p className="text-xl font-bold text-slate-700">{formatDate(editingMember.joinDate)}</p>
+                             </div>
+                          </div>
+
+                          {/* Contact Information Section */}
+                          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                             <div className="bg-slate-50 px-4 py-3 border-b border-slate-200">
+                                <h4 className="text-sm font-bold text-slate-700">Contact Information</h4>
+                             </div>
+                             <div className="p-4 space-y-3">
+                                <div className="flex justify-between items-start">
+                                   <span className="text-xs font-bold text-slate-400 uppercase">Email</span>
+                                   <span className="text-sm text-slate-700 text-right">{editingMember.email || 'Not provided'}</span>
+                                </div>
+                                <div className="flex justify-between items-start border-t border-slate-100 pt-3">
+                                   <span className="text-xs font-bold text-slate-400 uppercase">Phone</span>
+                                   <span className="text-sm text-slate-700 text-right">{editingMember.phone || 'Not provided'}</span>
+                                </div>
+                                <div className="flex justify-between items-start border-t border-slate-100 pt-3">
+                                   <span className="text-xs font-bold text-slate-400 uppercase">Mailing Address</span>
+                                   <span className="text-sm text-slate-700 text-right max-w-[200px]">{editingMember.address || 'Not provided'}</span>
+                                </div>
+                                <div className="flex justify-between items-start border-t border-slate-100 pt-3">
+                                   <span className="text-xs font-bold text-slate-400 uppercase">Beneficiary</span>
+                                   <span className="text-sm text-slate-700 text-right">{editingMember.beneficiary || 'Not designated'}</span>
+                                </div>
+                                <div className="flex justify-between items-start border-t border-slate-100 pt-3">
+                                   <span className="text-xs font-bold text-slate-400 uppercase">Status</span>
+                                   <span className={`text-xs font-bold px-2 py-1 rounded ${editingMember.accountStatus === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                      {editingMember.accountStatus}
+                                   </span>
+                                </div>
+                                {editingMember.autoPay && (
+                                   <div className="flex justify-between items-start border-t border-slate-100 pt-3">
+                                      <span className="text-xs font-bold text-slate-400 uppercase">Auto-Pay</span>
+                                      <span className="text-xs font-bold px-2 py-1 rounded bg-blue-100 text-blue-700">Enabled</span>
+                                   </div>
+                                )}
                              </div>
                           </div>
                           
