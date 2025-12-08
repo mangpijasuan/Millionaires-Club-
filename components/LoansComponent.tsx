@@ -21,9 +21,6 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
   const [term, setTerm] = useState(12);
   const [feeType, setFeeType] = useState<'upfront' | 'capitalized'>('upfront');
   
-  // Debug: Log isDark value
-  console.log('LoansComponent isDark:', isDark);
-  
   // Theme classes
   const cardClass = isDark ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200';
   const inputClass = isDark ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500' : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400';
