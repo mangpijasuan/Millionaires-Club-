@@ -10,6 +10,7 @@ import {
 import { Member, Loan, Transaction, CommunicationLog, YearlyContribution } from './types';
 import { CONTRIBUTIONS_DB, INITIAL_MEMBERS, CONTRIBUTION_HISTORY_DB } from './constants';
 import { callGemini } from './services/geminiService';
+import { StorageService, STORAGE_KEYS } from './services/storageService';
 
 // Sub-components
 import DashboardComponent from './components/DashboardComponent';
@@ -18,7 +19,6 @@ import ContributionsComponent from './components/ContributionsComponent';
 import LoansComponent from './components/LoansComponent';
 import TransactionHistoryComponent from './components/TransactionHistoryComponent';
 import ReportsComponent from './components/ReportsComponent';
-import MemberPortal from './components/MemberPortal';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -224,48 +224,33 @@ export default function App() {
   
   // -- State --
   const [members, setMembers] = useState<Member[]>(() => {
-    const saved = localStorage.getItem('mpm_members');
-    return saved ? JSON.parse(saved) : INITIAL_MEMBERS;
+    return StorageService.load(STORAGE_KEYS.MEMBERS, INITIAL_MEMBERS);
   });
 
   const [loans, setLoans] = useState<Loan[]>(() => {
-    const saved = localStorage.getItem('mpm_loans');
-    return saved ? JSON.parse(saved) : [];
+    return StorageService.load(STORAGE_KEYS.LOANS, []);
   });
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem('mpm_transactions');
-    return saved ? JSON.parse(saved) : [];
+    return StorageService.load(STORAGE_KEYS.TRANSACTIONS, []);
   });
 
   const [communicationLogs, setCommunicationLogs] = useState<CommunicationLog[]>(() => {
-      const saved = localStorage.getItem('mpm_comms');
-      return saved ? JSON.parse(saved) : [
+      return StorageService.load(STORAGE_KEYS.COMMUNICATION_LOGS, [
           { id: 'c1', memberId: 'MC-000001', type: 'System', content: 'Renewal Reminder Sent (30 Days)', date: '2025-11-25T10:00:00', direction: 'Outbound' }
-      ];
+      ]);
   });
 
   const [contributionHistory, setContributionHistory] = useState<Record<string, YearlyContribution>>(() => {
-      const saved = localStorage.getItem('mpm_history');
-      return saved ? JSON.parse(saved) : CONTRIBUTION_HISTORY_DB;
+      return StorageService.load('contribution_history', CONTRIBUTION_HISTORY_DB);
   });
 
   // -- Persistence --
-  useEffect(() => { localStorage.setItem('mpm_members', JSON.stringify(members)); }, [members]);
-  useEffect(() => { localStorage.setItem('mpm_loans', JSON.stringify(loans)); }, [loans]);
-  useEffect(() => { localStorage.setItem('mpm_transactions', JSON.stringify(transactions)); }, [transactions]);
-  useEffect(() => { localStorage.setItem('mpm_comms', JSON.stringify(communicationLogs)); }, [communicationLogs]);
-  useEffect(() => { localStorage.setItem('mpm_history', JSON.stringify(contributionHistory)); }, [contributionHistory]);
-
-  // -- Sync Effect: Keep currentMemberUser updated if Admin changes data --
-  useEffect(() => {
-    if (currentMemberUser) {
-      const updated = members.find(m => m.id === currentMemberUser.id);
-      if (updated && JSON.stringify(updated) !== JSON.stringify(currentMemberUser)) {
-        setCurrentMemberUser(updated);
-      }
-    }
-  }, [members, currentMemberUser]);
+  useEffect(() => { StorageService.save(STORAGE_KEYS.MEMBERS, members); }, [members]);
+  useEffect(() => { StorageService.save(STORAGE_KEYS.LOANS, loans); }, [loans]);
+  useEffect(() => { StorageService.save(STORAGE_KEYS.TRANSACTIONS, transactions); }, [transactions]);
+  useEffect(() => { StorageService.save(STORAGE_KEYS.COMMUNICATION_LOGS, communicationLogs); }, [communicationLogs]);
+  useEffect(() => { StorageService.save('contribution_history', contributionHistory); }, [contributionHistory]);
 
   // -- Notification Helper --
   const notify = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -452,12 +437,6 @@ export default function App() {
       setCurrentMemberUser(member);
       setViewMode('member_portal');
       notify(`Welcome back, ${member.name}`);
-  };
-
-  const handleMemberUpdateProfile = (updatedMember: Member) => {
-      setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
-      // setCurrentMemberUser is handled by the useEffect sync now
-      notify('Profile updated successfully.');
   };
 
   // --- Admin Auth Logic ---
@@ -824,27 +803,158 @@ export default function App() {
       );
   };
 
-  const SystemView = () => (
-    <div className="space-y-6 animate-in fade-in">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Clock size={20} className="text-purple-500"/> Task Automation</h3>
-                <div className="space-y-4 mt-4">
-                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
-                        <div><div className="font-bold text-slate-700 text-sm">Nightly Renewal Check</div></div>
-                        <button onClick={handleRunAutomation} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700">Run Now</button>
-                    </div>
-                </div>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Activity size={20} className="text-emerald-500"/> System Health</h3>
-                <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium mt-4">
-                    <CheckCircle size={16}/> All systems operational.
-                </div>
-            </div>
-        </div>
-    </div>
-  );
+  const handleExportData = () => {
+    const allData = {
+      members,
+      loans,
+      transactions,
+      communicationLogs,
+      contributionHistory,
+      exportDate: new Date().toISOString(),
+      version: '2.0'
+    };
+    
+    const dataStr = JSON.stringify(allData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `millionaires-club-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    notify('Data exported successfully!', 'success');
+  };
+
+  const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const importedData = JSON.parse(e.target?.result as string);
+        
+        if (importedData.members) setMembers(importedData.members);
+        if (importedData.loans) setLoans(importedData.loans);
+        if (importedData.transactions) setTransactions(importedData.transactions);
+        if (importedData.communicationLogs) setCommunicationLogs(importedData.communicationLogs);
+        if (importedData.contributionHistory) setContributionHistory(importedData.contributionHistory);
+        
+        notify('Data imported successfully!', 'success');
+      } catch (error) {
+        notify('Error importing data. Please check the file format.', 'error');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+  };
+
+  const handleClearAllData = () => {
+    if (window.confirm('⚠️ WARNING: This will delete ALL data permanently. Are you sure?')) {
+      if (window.confirm('This action cannot be undone. Export a backup first! Continue?')) {
+        StorageService.clearAll();
+        setMembers(INITIAL_MEMBERS);
+        setLoans([]);
+        setTransactions([]);
+        setCommunicationLogs([]);
+        setContributionHistory(CONTRIBUTION_HISTORY_DB);
+        notify('All data cleared', 'info');
+      }
+    }
+  };
+
+  const SystemView = () => {
+    const dataSize = new Blob([JSON.stringify({ members, loans, transactions })]).size;
+    const dataSizeKB = (dataSize / 1024).toFixed(2);
+    const lastSync = StorageService.load(STORAGE_KEYS.LAST_SYNC, null);
+
+    return (
+      <div className="space-y-6 animate-in fade-in">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                  <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Clock size={20} className="text-purple-500"/> Task Automation</h3>
+                  <div className="space-y-4 mt-4">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl border border-slate-100">
+                          <div><div className="font-bold text-slate-700 text-sm">Nightly Renewal Check</div></div>
+                          <button onClick={handleRunAutomation} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-bold hover:bg-purple-700">Run Now</button>
+                      </div>
+                  </div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                  <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><Activity size={20} className="text-emerald-500"/> System Health</h3>
+                  <div className="space-y-3 mt-4">
+                      <div className="flex items-center gap-2 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium">
+                          <CheckCircle size={16}/> All systems operational
+                      </div>
+                      <div className="text-xs text-slate-500 space-y-1">
+                          <div className="flex justify-between"><span>Data Size:</span><span className="font-mono font-bold">{dataSizeKB} KB</span></div>
+                          <div className="flex justify-between"><span>Members:</span><span className="font-bold">{members.length}</span></div>
+                          <div className="flex justify-between"><span>Active Loans:</span><span className="font-bold">{loans.filter(l => l.status === 'ACTIVE').length}</span></div>
+                          <div className="flex justify-between"><span>Transactions:</span><span className="font-bold">{transactions.length}</span></div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+
+          {/* Data Management */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Download size={20} className="text-blue-500"/> Data Management
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <button 
+                      onClick={handleExportData}
+                      className="flex flex-col items-center gap-2 p-4 bg-blue-50 hover:bg-blue-100 border-2 border-blue-200 rounded-xl transition-all group"
+                  >
+                      <Download size={24} className="text-blue-600 group-hover:scale-110 transition-transform"/>
+                      <div className="text-center">
+                          <div className="font-bold text-blue-900 text-sm">Export Backup</div>
+                          <div className="text-xs text-blue-600 mt-1">Download all data as JSON</div>
+                      </div>
+                  </button>
+
+                  <label className="flex flex-col items-center gap-2 p-4 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 rounded-xl transition-all cursor-pointer group">
+                      <Upload size={24} className="text-emerald-600 group-hover:scale-110 transition-transform"/>
+                      <div className="text-center">
+                          <div className="font-bold text-emerald-900 text-sm">Import Backup</div>
+                          <div className="text-xs text-emerald-600 mt-1">Restore from JSON file</div>
+                      </div>
+                      <input 
+                          type="file" 
+                          accept=".json"
+                          onChange={handleImportData}
+                          className="hidden"
+                      />
+                  </label>
+
+                  <button 
+                      onClick={handleClearAllData}
+                      className="flex flex-col items-center gap-2 p-4 bg-red-50 hover:bg-red-100 border-2 border-red-200 rounded-xl transition-all group"
+                  >
+                      <Trash2 size={24} className="text-red-600 group-hover:scale-110 transition-transform"/>
+                      <div className="text-center">
+                          <div className="font-bold text-red-900 text-sm">Clear All Data</div>
+                          <div className="text-xs text-red-600 mt-1">Reset to defaults</div>
+                      </div>
+                  </button>
+              </div>
+              
+              <div className="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                  <div className="flex items-start gap-2 text-xs text-slate-600">
+                      <AlertCircle size={14} className="mt-0.5 flex-shrink-0"/>
+                      <div>
+                          <strong>Data Storage:</strong> All data is stored locally in your browser's LocalStorage. 
+                          Export regular backups to prevent data loss. Data persists across browser sessions.
+                          {lastSync && <div className="mt-1 text-slate-500">Last saved: {formatDateTime(lastSync)}</div>}
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+    );
+  };
 
   const BatchUploadModal = () => {
     const [csvText, setCsvText] = useState('');
@@ -931,18 +1041,844 @@ export default function App() {
   }
 
   if (viewMode === 'member_portal' && currentMemberUser) {
+      const [memberTab, setMemberTab] = useState<'dashboard' | 'profile' | 'payments' | 'documents'>('dashboard');
+      const activeLoan = loans.find(l => l.id === currentMemberUser.activeLoanId);
       const history = contributionHistory[currentMemberUser.id] || CONTRIBUTION_HISTORY_DB[currentMemberUser.id] || {};
+      const sortedYears = Object.keys(history).map(Number).sort((a,b) => b-a);
+      const memberTransactions = transactions.filter(t => t.memberId === currentMemberUser.id);
+      const [showPaymentModal, setShowPaymentModal] = useState(false);
+      const [paymentMethod, setPaymentMethod] = useState<'zelle' | 'ach' | ''>('');
       
+      // Profile editing states
+      const [isEditingProfile, setIsEditingProfile] = useState(false);
+      const [isEditingBeneficiary, setIsEditingBeneficiary] = useState(false);
+      const [profileForm, setProfileForm] = useState({
+          name: currentMemberUser.name,
+          email: currentMemberUser.profile?.email || currentMemberUser.email || '',
+          phone: currentMemberUser.profile?.phone || currentMemberUser.phone || '',
+          address: currentMemberUser.profile?.address || currentMemberUser.address || '',
+          city: currentMemberUser.profile?.city || '',
+          state: currentMemberUser.profile?.state || '',
+          zipCode: currentMemberUser.profile?.zipCode || '',
+      });
+      const [beneficiaryForm, setBeneficiaryForm] = useState({
+          name: currentMemberUser.profile?.beneficiary?.name || currentMemberUser.beneficiary || '',
+          relationship: currentMemberUser.profile?.beneficiary?.relationship || 'Spouse',
+          phone: currentMemberUser.profile?.beneficiary?.phone || '',
+          email: currentMemberUser.profile?.beneficiary?.email || '',
+      });
+      
+      // Payment confirmation states
+      const [pendingPayment, setPendingPayment] = useState<{amount: number, method: string, reference: string} | null>(null);
+      const [paymentStep, setPaymentStep] = useState<'select' | 'instructions' | 'confirm'>('select');
+      
+      // Auto-pay toggle
+      const [autoPayEnabled, setAutoPayEnabled] = useState(currentMemberUser.profile?.autoPayEnabled || false);
+      
+      // Save profile handler
+      const handleSaveProfile = () => {
+          const updatedMember = {
+              ...currentMemberUser,
+              name: profileForm.name,
+              email: profileForm.email,
+              phone: profileForm.phone,
+              address: profileForm.address,
+              profile: {
+                  ...currentMemberUser.profile,
+                  email: profileForm.email,
+                  phone: profileForm.phone,
+                  address: profileForm.address,
+                  city: profileForm.city,
+                  state: profileForm.state,
+                  zipCode: profileForm.zipCode,
+                  beneficiary: currentMemberUser.profile?.beneficiary || { name: '', relationship: '', phone: '', email: '' },
+                  autoPayEnabled: autoPayEnabled,
+                  preferredPaymentMethod: currentMemberUser.profile?.preferredPaymentMethod || 'none',
+              }
+          };
+          setMembers(prev => prev.map(m => m.id === currentMemberUser.id ? updatedMember : m));
+          setCurrentMemberUser(updatedMember);
+          setIsEditingProfile(false);
+          notify('Profile updated successfully!', 'success');
+      };
+      
+      // Save beneficiary handler
+      const handleSaveBeneficiary = () => {
+          const updatedMember = {
+              ...currentMemberUser,
+              beneficiary: beneficiaryForm.name,
+              profile: {
+                  ...currentMemberUser.profile,
+                  email: currentMemberUser.profile?.email || '',
+                  phone: currentMemberUser.profile?.phone || '',
+                  address: currentMemberUser.profile?.address || '',
+                  city: currentMemberUser.profile?.city || '',
+                  state: currentMemberUser.profile?.state || '',
+                  zipCode: currentMemberUser.profile?.zipCode || '',
+                  autoPayEnabled: autoPayEnabled,
+                  preferredPaymentMethod: currentMemberUser.profile?.preferredPaymentMethod || 'none',
+                  beneficiary: beneficiaryForm,
+              }
+          };
+          setMembers(prev => prev.map(m => m.id === currentMemberUser.id ? updatedMember : m));
+          setCurrentMemberUser(updatedMember);
+          setIsEditingBeneficiary(false);
+          notify('Beneficiary information updated!', 'success');
+      };
+      
+      // Payment confirmation handler
+      const handlePaymentConfirmation = (method: 'zelle' | 'ach') => {
+          const reference = `PAY-${Date.now().toString(36).toUpperCase()}`;
+          setPendingPayment({ amount: 20, method, reference });
+          setPaymentStep('confirm');
+      };
+      
+      // Record payment after confirmation
+      const handleRecordPayment = () => {
+          if (!pendingPayment) return;
+          
+          const newTransaction: Transaction = {
+              id: generateId(),
+              memberId: currentMemberUser.id,
+              type: 'CONTRIBUTION',
+              amount: pendingPayment.amount,
+              date: new Date().toISOString().split('T')[0],
+              description: `Monthly contribution via ${pendingPayment.method.toUpperCase()}`,
+              paymentMethod: pendingPayment.method,
+          };
+          
+          setTransactions(prev => [...prev, newTransaction]);
+          
+          // Update member contribution
+          const updatedMember = {
+              ...currentMemberUser,
+              totalContribution: (currentMemberUser.totalContribution || 0) + pendingPayment.amount,
+          };
+          setMembers(prev => prev.map(m => m.id === currentMemberUser.id ? updatedMember : m));
+          setCurrentMemberUser(updatedMember);
+          
+          setShowPaymentModal(false);
+          setPendingPayment(null);
+          setPaymentMethod('');
+          setPaymentStep('select');
+          notify(`Payment of $${pendingPayment.amount.toFixed(2)} recorded successfully!`, 'success');
+      };
+
       return (
-        <MemberPortal 
-            member={currentMemberUser}
-            setMember={setCurrentMemberUser}
-            onUpdateProfile={handleMemberUpdateProfile}
-            loans={loans}
-            transactions={transactions}
-            history={history}
-            onLogout={() => { setViewMode('landing'); setCurrentMemberUser(null); }}
-        />
+        <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+             {/* Header */}
+             <div className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+                 <div className="flex items-center gap-2 font-bold text-slate-800">
+                    <div className="p-1.5 bg-emerald-500 rounded-lg text-white"><Users size={16} /></div>
+                    Millionaires Club Portal
+                 </div>
+                 <div className="flex items-center gap-4">
+                     <button onClick={() => setShowPaymentModal(true)} className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-bold">
+                         <Wallet size={16}/> Make Payment
+                     </button>
+                     <div className="text-right hidden sm:block">
+                         <p className="text-sm font-bold text-slate-800">{currentMemberUser.name}</p>
+                         <p className="text-xs text-slate-500">{currentMemberUser.id}</p>
+                     </div>
+                     <button onClick={() => { setViewMode('landing'); setCurrentMemberUser(null); }} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition-colors text-slate-600 flex items-center gap-2">
+                         <LogOut size={18}/> <span className="text-xs font-bold hidden sm:inline">Sign Out</span>
+                     </button>
+                 </div>
+             </div>
+
+             {/* Navigation Tabs */}
+             <div className="bg-white border-b border-slate-200">
+                 <div className="max-w-7xl mx-auto px-6">
+                     <div className="flex gap-1 overflow-x-auto">
+                         <button 
+                             onClick={() => setMemberTab('dashboard')}
+                             className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-all ${
+                                 memberTab === 'dashboard' 
+                                 ? 'text-emerald-600 border-b-2 border-emerald-600' 
+                                 : 'text-slate-500 hover:text-slate-700'
+                             }`}
+                         >
+                             <div className="flex items-center gap-2">
+                                 <LayoutDashboard size={16}/> Dashboard
+                             </div>
+                         </button>
+                         <button 
+                             onClick={() => setMemberTab('profile')}
+                             className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-all ${
+                                 memberTab === 'profile' 
+                                 ? 'text-emerald-600 border-b-2 border-emerald-600' 
+                                 : 'text-slate-500 hover:text-slate-700'
+                             }`}
+                         >
+                             <div className="flex items-center gap-2">
+                                 <UserCheck size={16}/> Profile
+                             </div>
+                         </button>
+                         <button 
+                             onClick={() => setMemberTab('payments')}
+                             className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-all ${
+                                 memberTab === 'payments' 
+                                 ? 'text-emerald-600 border-b-2 border-emerald-600' 
+                                 : 'text-slate-500 hover:text-slate-700'
+                             }`}
+                         >
+                             <div className="flex items-center gap-2">
+                                 <Wallet size={16}/> Payments
+                             </div>
+                         </button>
+                         <button 
+                             onClick={() => setMemberTab('documents')}
+                             className={`px-6 py-3 font-medium text-sm whitespace-nowrap transition-all ${
+                                 memberTab === 'documents' 
+                                 ? 'text-emerald-600 border-b-2 border-emerald-600' 
+                                 : 'text-slate-500 hover:text-slate-700'
+                             }`}
+                         >
+                             <div className="flex items-center gap-2">
+                                 <FileText size={16}/> Documents
+                             </div>
+                         </button>
+                     </div>
+                 </div>
+             </div>
+
+             {/* Payment Modal */}
+             {showPaymentModal && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                     <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl p-6 max-h-[90vh] overflow-y-auto">
+                         <div className="flex justify-between items-center mb-6">
+                             <h3 className="font-bold text-2xl text-slate-800 flex items-center gap-2">
+                                 <Wallet size={24} className="text-emerald-500"/> Make a Payment
+                             </h3>
+                             <button onClick={() => { setShowPaymentModal(false); setPaymentMethod(''); }}>
+                                 <X size={24} className="text-slate-400 hover:text-slate-600"/>
+                             </button>
+                         </div>
+
+                         {!paymentMethod ? (
+                             <div className="space-y-4">
+                                 <p className="text-slate-600 mb-6">Choose your preferred payment method:</p>
+                                 
+                                 {/* Zelle Option */}
+                                 <button 
+                                     onClick={() => setPaymentMethod('zelle')}
+                                     className="w-full p-6 border-2 border-slate-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left"
+                                 >
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-purple-100 group-hover:bg-purple-200 rounded-xl">
+                                             <ArrowRightLeft size={24} className="text-purple-600"/>
+                                         </div>
+                                         <div className="flex-1">
+                                             <h4 className="font-bold text-lg text-slate-800">Zelle</h4>
+                                             <p className="text-sm text-slate-500">Instant transfer via Zelle</p>
+                                         </div>
+                                         <ChevronRight className="text-slate-400 group-hover:text-emerald-600"/>
+                                     </div>
+                                 </button>
+
+                                 {/* QuickBooks ACH Option */}
+                                 <button 
+                                     onClick={() => setPaymentMethod('ach')}
+                                     className="w-full p-6 border-2 border-slate-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group text-left"
+                                 >
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-blue-100 group-hover:bg-blue-200 rounded-xl">
+                                             <Calculator size={24} className="text-blue-600"/>
+                                         </div>
+                                         <div className="flex-1">
+                                             <h4 className="font-bold text-lg text-slate-800">ACH Transfer</h4>
+                                             <p className="text-sm text-slate-500">Direct bank transfer via QuickBooks</p>
+                                         </div>
+                                         <ChevronRight className="text-slate-400 group-hover:text-emerald-600"/>
+                                     </div>
+                                 </button>
+                             </div>
+                         ) : paymentMethod === 'zelle' ? (
+                             <div className="space-y-6">
+                                 <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl">
+                                     <h4 className="font-bold text-purple-900 mb-3 flex items-center gap-2">
+                                         <ArrowRightLeft size={18}/> Zelle Payment Instructions
+                                     </h4>
+                                     <div className="space-y-3 text-sm">
+                                         <div>
+                                             <p className="text-purple-600 font-medium">Send to:</p>
+                                             <p className="font-mono text-lg font-bold text-purple-900">payments@millionairesclub.com</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-purple-600 font-medium">Amount:</p>
+                                             <p className="text-2xl font-bold text-purple-900">$20.00</p>
+                                             <p className="text-xs text-purple-600 mt-1">Monthly contribution</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-purple-600 font-medium">Reference:</p>
+                                             <p className="font-mono font-bold text-purple-900">{currentMemberUser.id} - {currentMemberUser.name}</p>
+                                         </div>
+                                     </div>
+                                 </div>
+
+                                 <div className="bg-slate-50 p-4 rounded-xl">
+                                     <h5 className="font-bold text-slate-700 mb-2">How to pay:</h5>
+                                     <ol className="text-sm text-slate-600 space-y-2 list-decimal list-inside">
+                                         <li>Open your banking app</li>
+                                         <li>Find Zelle® in your app</li>
+                                         <li>Add recipient: <span className="font-mono font-bold">payments@millionairesclub.com</span></li>
+                                         <li>Enter amount: <span className="font-bold">$20.00</span></li>
+                                         <li>Add note: <span className="font-mono">{currentMemberUser.id}</span></li>
+                                         <li>Review and send</li>
+                                     </ol>
+                                 </div>
+
+                                 <div className="flex gap-3">
+                                     <button 
+                                         onClick={() => setPaymentMethod('')}
+                                         className="flex-1 py-3 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
+                                     >
+                                         Back
+                                     </button>
+                                     <button 
+                                         onClick={() => { setShowPaymentModal(false); setPaymentMethod(''); notify('Payment instructions copied!', 'success'); }}
+                                         className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700"
+                                     >
+                                         Done
+                                     </button>
+                                 </div>
+                             </div>
+                         ) : (
+                             <div className="space-y-6">
+                                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                                     <h4 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                                         <Calculator size={18}/> ACH Transfer via QuickBooks
+                                     </h4>
+                                     <div className="space-y-3 text-sm">
+                                         <div>
+                                             <p className="text-blue-600 font-medium">Account Name:</p>
+                                             <p className="font-bold text-blue-900">Millionaires Club Fund</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-blue-600 font-medium">Account Number:</p>
+                                             <p className="font-mono text-lg font-bold text-blue-900">****1234</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-blue-600 font-medium">Routing Number:</p>
+                                             <p className="font-mono text-lg font-bold text-blue-900">021000021</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-blue-600 font-medium">Amount:</p>
+                                             <p className="text-2xl font-bold text-blue-900">$20.00</p>
+                                         </div>
+                                         <div>
+                                             <p className="text-blue-600 font-medium">Reference:</p>
+                                             <p className="font-mono font-bold text-blue-900">{currentMemberUser.id}</p>
+                                         </div>
+                                     </div>
+                                 </div>
+
+                                 <div className="bg-slate-50 p-4 rounded-xl">
+                                     <h5 className="font-bold text-slate-700 mb-2">Processing Time:</h5>
+                                     <p className="text-sm text-slate-600">ACH transfers typically take 1-3 business days to process. You'll receive a confirmation email once the payment is received.</p>
+                                 </div>
+
+                                 <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl">
+                                     <p className="text-xs text-amber-800 flex items-start gap-2">
+                                         <AlertCircle size={16} className="mt-0.5 flex-shrink-0"/>
+                                         <span>Please ensure you include your Member ID ({currentMemberUser.id}) in the transfer reference to ensure proper crediting.</span>
+                                     </p>
+                                 </div>
+
+                                 <div className="flex gap-3">
+                                     <button 
+                                         onClick={() => setPaymentMethod('')}
+                                         className="flex-1 py-3 border border-slate-300 rounded-lg font-bold text-slate-700 hover:bg-slate-50"
+                                     >
+                                         Back
+                                     </button>
+                                     <button 
+                                         onClick={() => { setShowPaymentModal(false); setPaymentMethod(''); notify('Bank details noted', 'info'); }}
+                                         className="flex-1 py-3 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700"
+                                     >
+                                         Done
+                                     </button>
+                                 </div>
+                             </div>
+                         )}
+                     </div>
+                 </div>
+             )}
+
+             <div className="max-w-7xl mx-auto p-4 sm:p-6">
+                 {/* Dashboard Tab */}
+                 {memberTab === 'dashboard' && (
+                     <>
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                             <div className="bg-white p-6 rounded-2xl shadow border border-slate-200">
+                                 <div className="flex items-center justify-between mb-2">
+                                     <p className="text-slate-500 text-sm">My Contribution</p>
+                                     <DollarSign size={20} className="text-emerald-500"/>
+                                 </div>
+                                 <p className="text-3xl font-bold text-slate-900">${currentMemberUser.contribution.toFixed(2)}</p>
+                                 <p className="text-xs text-slate-500 mt-2">Total contributed to club</p>
+                             </div>
+
+                             <div className="bg-white p-6 rounded-2xl shadow border border-slate-200">
+                                 <div className="flex items-center justify-between mb-2">
+                                     <p className="text-slate-500 text-sm">Active Loan</p>
+                                     <TrendingUp size={20} className="text-blue-500"/>
+                                 </div>
+                                 <p className="text-3xl font-bold text-slate-900">
+                                     {activeLoan ? `$${activeLoan.amount.toFixed(2)}` : '$0.00'}
+                                 </p>
+                                 <p className="text-xs text-slate-500 mt-2">
+                                     {activeLoan ? `Borrowed on ${activeLoan.startDate}` : 'No active loan'}
+                                 </p>
+                             </div>
+
+                             <div className="bg-white p-6 rounded-2xl shadow border border-slate-200">
+                                 <div className="flex items-center justify-between mb-2">
+                                     <p className="text-slate-500 text-sm">Status</p>
+                                     <UserCheck size={20} className={currentMemberUser.isActive ? "text-emerald-500" : "text-slate-400"}/>
+                                 </div>
+                                 <p className="text-3xl font-bold text-slate-900">{currentMemberUser.isActive ? "Active" : "Inactive"}</p>
+                                 <p className="text-xs text-slate-500 mt-2">Member since {members.find(m => m.id === currentMemberUser.id)?.joinedDate || 'Unknown'}</p>
+                             </div>
+                         </div>
+
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                             {/* Contribution History */}
+                             <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                     <Calendar size={22} className="text-emerald-500"/> Contribution History
+                                 </h3>
+                                 {sortedYears.length === 0 ? (
+                                     <p className="text-slate-500 text-sm">No contribution history yet.</p>
+                                 ) : (
+                                     <div className="space-y-3">
+                                         {sortedYears.map(year => {
+                                             const monthData = history[year];
+                                             const monthsPaid = Object.keys(monthData).filter(month => monthData[month]).length;
+                                             return (
+                                                 <div key={year} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
+                                                     <div className="flex justify-between items-center">
+                                                         <div>
+                                                             <p className="font-bold text-slate-800">{year}</p>
+                                                             <p className="text-sm text-slate-500">{monthsPaid} / 12 months paid</p>
+                                                         </div>
+                                                         <div className="text-right">
+                                                             <p className="text-2xl font-bold text-emerald-600">${(monthsPaid * 20).toFixed(2)}</p>
+                                                         </div>
+                                                     </div>
+                                                     <div className="grid grid-cols-6 gap-1 mt-3">
+                                                         {Object.keys(monthData).map(month => (
+                                                             <div key={month} className={`h-6 rounded ${monthData[month] ? 'bg-emerald-500' : 'bg-slate-200'}`} title={`${month}: ${monthData[month] ? 'Paid' : 'Unpaid'}`}></div>
+                                                         ))}
+                                                     </div>
+                                                 </div>
+                                             );
+                                         })}
+                                     </div>
+                                 )}
+                             </div>
+
+                             {/* Recent Activity */}
+                             <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                                 <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                     <TrendingUp size={22} className="text-blue-500"/> Recent Activity
+                                 </h3>
+                                 {memberTransactions.length === 0 ? (
+                                     <p className="text-slate-500 text-sm">No transactions yet.</p>
+                                 ) : (
+                                     <div className="space-y-3">
+                                         {memberTransactions.slice(0, 5).map(t => (
+                                             <div key={t.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+                                                 <div className="flex items-center gap-3">
+                                                     <div className={`p-2 rounded-lg ${t.type === 'contribution' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                                                         {t.type === 'contribution' ? <DollarSign size={18} className="text-emerald-600"/> : <TrendingUp size={18} className="text-blue-600"/>}
+                                                     </div>
+                                                     <div>
+                                                         <p className="font-bold text-slate-800 text-sm">{t.type === 'contribution' ? 'Contribution' : 'Loan'}</p>
+                                                         <p className="text-xs text-slate-500">{t.date}</p>
+                                                     </div>
+                                                 </div>
+                                                 <p className="font-bold text-lg text-slate-800">${t.amount.toFixed(2)}</p>
+                                             </div>
+                                         ))}
+                                     </div>
+                                 )}
+                             </div>
+                         </div>
+                     </>
+                 )}
+
+                 {/* Profile Tab */}
+                 {memberTab === 'profile' && (
+                     <div className="max-w-4xl mx-auto space-y-6">
+                         {/* Personal Information */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <div className="flex items-center justify-between mb-6">
+                                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                     <UserCheck size={22} className="text-emerald-500"/> Personal Information
+                                 </h3>
+                                 <button className="px-4 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 text-sm font-bold flex items-center gap-2">
+                                     <Edit2 size={14}/> Edit Profile
+                                 </button>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Full Name</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="font-bold text-slate-800">{currentMemberUser.name}</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Member ID</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="font-mono font-bold text-slate-800">{currentMemberUser.id}</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Email Address</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">member@example.com</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Phone Number</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">(555) 123-4567</p>
+                                     </div>
+                                 </div>
+
+                                 <div className="md:col-span-2">
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Address</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">123 Main Street, Apt 4B, New York, NY 10001</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Membership Details */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <Users size={22} className="text-blue-500"/> Membership Details
+                             </h3>
+
+                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Member Since</label>
+                                     <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                         <p className="font-bold text-blue-900">{members.find(m => m.id === currentMemberUser.id)?.joinedDate || 'Unknown'}</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Status</label>
+                                     <div className={`p-3 rounded-lg border ${currentMemberUser.isActive ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200'}`}>
+                                         <p className={`font-bold ${currentMemberUser.isActive ? 'text-emerald-900' : 'text-slate-600'}`}>
+                                             {currentMemberUser.isActive ? 'Active' : 'Inactive'}
+                                         </p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Total Contributions</label>
+                                     <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                                         <p className="font-bold text-emerald-900">${currentMemberUser.contribution.toFixed(2)}</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Beneficiary Information */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <div className="flex items-center justify-between mb-6">
+                                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                     <Heart size={22} className="text-rose-500"/> Beneficiary Information
+                                 </h3>
+                                 <button className="px-4 py-2 bg-rose-100 text-rose-700 rounded-lg hover:bg-rose-200 text-sm font-bold flex items-center gap-2">
+                                     <Edit2 size={14}/> Update
+                                 </button>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Beneficiary Name</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">Jane Doe</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Relationship</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">Spouse</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Phone Number</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">(555) 987-6543</p>
+                                     </div>
+                                 </div>
+
+                                 <div>
+                                     <label className="text-sm font-medium text-slate-500 block mb-2">Email</label>
+                                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                         <p className="text-slate-800">jane.doe@example.com</p>
+                                     </div>
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Security Settings */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <Shield size={22} className="text-purple-500"/> Security Settings
+                             </h3>
+
+                             <div className="space-y-4">
+                                 <button className="w-full p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between">
+                                     <div className="flex items-center gap-3">
+                                         <Lock size={20} className="text-slate-500"/>
+                                         <div className="text-left">
+                                             <p className="font-bold text-slate-800">Change Password</p>
+                                             <p className="text-xs text-slate-500">Last changed 30 days ago</p>
+                                         </div>
+                                     </div>
+                                     <ChevronRight className="text-slate-400"/>
+                                 </button>
+
+                                 <button className="w-full p-4 bg-slate-50 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between">
+                                     <div className="flex items-center gap-3">
+                                         <Shield size={20} className="text-slate-500"/>
+                                         <div className="text-left">
+                                             <p className="font-bold text-slate-800">Two-Factor Authentication</p>
+                                             <p className="text-xs text-slate-500">Not enabled</p>
+                                         </div>
+                                     </div>
+                                     <ChevronRight className="text-slate-400"/>
+                                 </button>
+                             </div>
+                         </div>
+                     </div>
+                 )}
+
+                 {/* Payments Tab */}
+                 {memberTab === 'payments' && (
+                     <div className="max-w-5xl mx-auto space-y-6">
+                         {/* Quick Actions */}
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <button 
+                                 onClick={() => { setShowPaymentModal(true); setPaymentMethod('zelle'); }}
+                                 className="bg-gradient-to-br from-purple-500 to-purple-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all text-white group"
+                             >
+                                 <div className="flex items-center justify-between mb-4">
+                                     <ArrowRightLeft size={32}/>
+                                     <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform"/>
+                                 </div>
+                                 <h4 className="text-xl font-bold mb-2">Pay with Zelle</h4>
+                                 <p className="text-purple-100 text-sm">Instant transfer • Free • Easy</p>
+                             </button>
+
+                             <button 
+                                 onClick={() => { setShowPaymentModal(true); setPaymentMethod('ach'); }}
+                                 className="bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-2xl shadow-lg hover:shadow-xl transition-all text-white group"
+                             >
+                                 <div className="flex items-center justify-between mb-4">
+                                     <Calculator size={32}/>
+                                     <ChevronRight size={24} className="group-hover:translate-x-1 transition-transform"/>
+                                 </div>
+                                 <h4 className="text-xl font-bold mb-2">ACH Transfer</h4>
+                                 <p className="text-blue-100 text-sm">Bank transfer • Secure • 1-3 days</p>
+                             </button>
+                         </div>
+
+                         {/* Payment History */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <Clock size={22} className="text-emerald-500"/> Payment History
+                             </h3>
+
+                             {memberTransactions.filter(t => t.type === 'contribution').length === 0 ? (
+                                 <div className="text-center py-12">
+                                     <Wallet size={48} className="text-slate-300 mx-auto mb-4"/>
+                                     <p className="text-slate-500 font-medium">No payments yet</p>
+                                     <p className="text-sm text-slate-400 mt-2">Your payment history will appear here</p>
+                                 </div>
+                             ) : (
+                                 <div className="space-y-3">
+                                     {memberTransactions.filter(t => t.type === 'contribution').map(t => (
+                                         <div key={t.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
+                                             <div className="flex items-center gap-4">
+                                                 <div className="p-3 bg-emerald-100 rounded-xl">
+                                                     <DollarSign size={20} className="text-emerald-600"/>
+                                                 </div>
+                                                 <div>
+                                                     <p className="font-bold text-slate-800">Monthly Contribution</p>
+                                                     <p className="text-sm text-slate-500">{t.date}</p>
+                                                 </div>
+                                             </div>
+                                             <div className="text-right">
+                                                 <p className="text-xl font-bold text-emerald-600">${t.amount.toFixed(2)}</p>
+                                                 <p className="text-xs text-slate-500">Completed</p>
+                                             </div>
+                                         </div>
+                                     ))}
+                                 </div>
+                             )}
+                         </div>
+
+                         {/* Saved Payment Methods */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <div className="flex items-center justify-between mb-6">
+                                 <h3 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                     <CreditCard size={22} className="text-blue-500"/> Saved Payment Methods
+                                 </h3>
+                                 <button className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 text-sm font-bold flex items-center gap-2">
+                                     <Plus size={14}/> Add Method
+                                 </button>
+                             </div>
+
+                             <div className="space-y-3">
+                                 <div className="p-4 bg-purple-50 border-2 border-purple-200 rounded-xl flex items-center justify-between">
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-purple-200 rounded-xl">
+                                             <ArrowRightLeft size={20} className="text-purple-700"/>
+                                         </div>
+                                         <div>
+                                             <p className="font-bold text-slate-800">Zelle</p>
+                                             <p className="text-sm text-slate-500">payments@millionairesclub.com</p>
+                                         </div>
+                                     </div>
+                                     <span className="px-3 py-1 bg-purple-200 text-purple-700 rounded-full text-xs font-bold">Default</span>
+                                 </div>
+
+                                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-blue-100 rounded-xl">
+                                             <Calculator size={20} className="text-blue-600"/>
+                                         </div>
+                                         <div>
+                                             <p className="font-bold text-slate-800">ACH Transfer</p>
+                                             <p className="text-sm text-slate-500">Bank Account ****1234</p>
+                                         </div>
+                                     </div>
+                                     <button className="text-slate-400 hover:text-slate-600">
+                                         <Edit2 size={16}/>
+                                     </button>
+                                 </div>
+                             </div>
+                         </div>
+
+                         {/* Auto-Pay Settings */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <RefreshCw size={22} className="text-amber-500"/> Auto-Pay Settings
+                             </h3>
+
+                             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
+                                 <div className="flex items-start gap-3">
+                                     <AlertCircle size={20} className="text-amber-600 mt-0.5 flex-shrink-0"/>
+                                     <div>
+                                         <p className="font-bold text-amber-900 mb-1">Auto-Pay Not Enabled</p>
+                                         <p className="text-sm text-amber-700">Enable auto-pay to never miss a contribution. We'll automatically process your $20 monthly payment.</p>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <button className="w-full p-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors font-bold flex items-center justify-center gap-2">
+                                 <RefreshCw size={18}/> Enable Auto-Pay
+                             </button>
+                         </div>
+                     </div>
+                 )}
+
+                 {/* Documents Tab */}
+                 {memberTab === 'documents' && (
+                     <div className="max-w-4xl mx-auto space-y-6">
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                                 <FileText size={22} className="text-blue-500"/> My Documents
+                             </h3>
+
+                             <div className="space-y-3">
+                                 <button className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between group">
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-blue-100 rounded-xl">
+                                             <FileText size={20} className="text-blue-600"/>
+                                         </div>
+                                         <div className="text-left">
+                                             <p className="font-bold text-slate-800">Membership Agreement</p>
+                                             <p className="text-sm text-slate-500">Signed on {members.find(m => m.id === currentMemberUser.id)?.joinedDate || 'Unknown'}</p>
+                                         </div>
+                                     </div>
+                                     <Download className="text-slate-400 group-hover:text-blue-600"/>
+                                 </button>
+
+                                 <button className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between group">
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-emerald-100 rounded-xl">
+                                             <FileText size={20} className="text-emerald-600"/>
+                                         </div>
+                                         <div className="text-left">
+                                             <p className="font-bold text-slate-800">2024 Contribution Statement</p>
+                                             <p className="text-sm text-slate-500">Year-to-date summary</p>
+                                         </div>
+                                     </div>
+                                     <Download className="text-slate-400 group-hover:text-emerald-600"/>
+                                 </button>
+
+                                 <button className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between group">
+                                     <div className="flex items-center gap-4">
+                                         <div className="p-3 bg-purple-100 rounded-xl">
+                                             <FileText size={20} className="text-purple-600"/>
+                                         </div>
+                                         <div className="text-left">
+                                             <p className="font-bold text-slate-800">Tax Documents</p>
+                                             <p className="text-sm text-slate-500">Forms and receipts</p>
+                                         </div>
+                                     </div>
+                                     <Download className="text-slate-400 group-hover:text-purple-600"/>
+                                 </button>
+
+                                 {activeLoan && (
+                                     <button className="w-full p-4 bg-slate-50 rounded-xl border border-slate-200 hover:bg-slate-100 transition-colors flex items-center justify-between group">
+                                         <div className="flex items-center gap-4">
+                                             <div className="p-3 bg-amber-100 rounded-xl">
+                                                 <FileText size={20} className="text-amber-600"/>
+                                             </div>
+                                             <div className="text-left">
+                                                 <p className="font-bold text-slate-800">Loan Agreement</p>
+                                                 <p className="text-sm text-slate-500">${activeLoan.amount.toFixed(2)} • {activeLoan.startDate}</p>
+                                             </div>
+                                         </div>
+                                         <Download className="text-slate-400 group-hover:text-amber-600"/>
+                                     </button>
+                                 )}
+                             </div>
+                         </div>
+
+                         {/* Upload Documents */}
+                         <div className="bg-white rounded-2xl shadow border border-slate-200 p-6">
+                             <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                 <Upload size={22} className="text-green-500"/> Upload Documents
+                             </h3>
+                             <p className="text-sm text-slate-500 mb-6">Upload supporting documents for loan applications or other requests</p>
+                             
+                             <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-emerald-500 hover:bg-emerald-50 transition-colors cursor-pointer">
+                                 <Upload size={48} className="text-slate-400 mx-auto mb-4"/>
+                                 <p className="font-bold text-slate-700 mb-2">Click to upload or drag and drop</p>
+                                 <p className="text-sm text-slate-500">PDF, PNG, JPG up to 10MB</p>
+                             </div>
+                         </div>
+                     </div>
+                 )}
+             </div>
+        </div>
       );
   }
 
@@ -1006,9 +1942,15 @@ export default function App() {
           </header>
 
           <div className="flex-1 p-4 md:p-10 overflow-y-auto">
-              <header className="mb-6 hidden md:block">
-              <h2 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">{activeTab}</h2>
-              <p className="text-slate-500 mt-1">Manage your community portfolio efficiently.</p>
+              <header className="mb-6 hidden md:flex justify-between items-center">
+                <div>
+                  <h2 className="text-3xl font-bold text-slate-800 capitalize tracking-tight">{activeTab}</h2>
+                  <p className="text-slate-500 mt-1">Manage your community portfolio efficiently.</p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-400">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                  <span>Auto-saving to browser</span>
+                </div>
               </header>
               
               {activeTab === 'dashboard' && <DashboardComponent members={members} loans={loans} transactions={transactions} setActiveTab={setActiveTab} />}

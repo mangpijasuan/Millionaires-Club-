@@ -1,3 +1,22 @@
+export interface BeneficiaryInfo {
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string;
+}
+
+export interface MemberProfile {
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  beneficiary: BeneficiaryInfo;
+  autoPayEnabled: boolean;
+  preferredPaymentMethod: 'zelle' | 'ach' | 'none';
+}
+
 export interface Member {
   id: string;
   name: string;
@@ -11,6 +30,19 @@ export interface Member {
   activeLoanId: string | null;
   lastLoanPaidDate: string | null;
   autoPay?: boolean;
+  // Extended profile fields
+  profile?: MemberProfile;
+}
+
+export interface PendingPayment {
+  id: string;
+  memberId: string;
+  amount: number;
+  method: 'zelle' | 'ach';
+  status: 'pending' | 'confirmed' | 'failed';
+  createdAt: string;
+  confirmedAt?: string;
+  referenceNumber?: string;
 }
 
 export interface Loan {
