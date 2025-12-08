@@ -27,6 +27,11 @@ const MemberPortal: React.FC<MemberPortalProps> = ({
   // -- Profile Edit State --
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Member>>({});
+  
+  // -- ACH Form State --
+  const [showACHForm, setShowACHForm] = useState(false);
+  const [achForm, setAchForm] = useState({ routingNumber: '', accountNumber: '', accountType: 'checking', accountHolderName: '' });
+  const [achSubmitted, setAchSubmitted] = useState(false);
 
   // -- Derived Data --
   const activeLoan = loans.find(l => l.id === member.activeLoanId);
@@ -64,6 +69,14 @@ const MemberPortal: React.FC<MemberPortalProps> = ({
     const updated = { ...member, autoPay: !member.autoPay };
     setMember(updated);
     onUpdateProfile(updated);
+  };
+
+  const handleACHSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In production, this would send to backend for admin to setup in QBO
+    setAchSubmitted(true);
+    setShowACHForm(false);
+    // You could also save to member profile here
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -404,13 +417,93 @@ const MemberPortal: React.FC<MemberPortalProps> = ({
                                  </div>
 
                                  {/* ACH Option */}
-                                 <div className="p-4 border border-slate-200 rounded-xl hover:border-emerald-400 hover:bg-emerald-50 transition-colors cursor-pointer">
+                                 <div className="p-4 border border-slate-200 rounded-xl">
                                      <div className="flex items-center gap-3 mb-2">
                                          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xs">ACH</div>
-                                         <span className="font-bold text-slate-700">Bank Transfer</span>
+                                         <span className="font-bold text-slate-700">Bank Transfer (ACH)</span>
                                      </div>
-                                     <p className="text-sm text-slate-600">Link your bank account for direct transfers.</p>
-                                     <button className="mt-3 w-full py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50">Setup ACH</button>
+                                     {achSubmitted ? (
+                                         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 mt-2">
+                                             <p className="text-sm text-emerald-700 font-medium flex items-center gap-2">
+                                                 <CheckCircle size={16}/> ACH info submitted! Admin will set up auto-debit.
+                                             </p>
+                                         </div>
+                                     ) : !showACHForm ? (
+                                         <>
+                                             <p className="text-sm text-slate-600">Link your bank account for automatic monthly deductions via QuickBooks.</p>
+                                             <button 
+                                                 onClick={() => setShowACHForm(true)}
+                                                 className="mt-3 w-full py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition-colors"
+                                             >
+                                                 Setup ACH Direct Debit
+                                             </button>
+                                         </>
+                                     ) : (
+                                         <form onSubmit={handleACHSubmit} className="mt-3 space-y-3">
+                                             <div>
+                                                 <label className="text-xs font-bold text-slate-500 uppercase">Account Holder Name</label>
+                                                 <input 
+                                                     type="text" 
+                                                     required
+                                                     placeholder="John Doe"
+                                                     value={achForm.accountHolderName}
+                                                     onChange={(e) => setAchForm({...achForm, accountHolderName: e.target.value})}
+                                                     className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                 />
+                                             </div>
+                                             <div>
+                                                 <label className="text-xs font-bold text-slate-500 uppercase">Routing Number</label>
+                                                 <input 
+                                                     type="text" 
+                                                     required
+                                                     placeholder="9 digits"
+                                                     maxLength={9}
+                                                     pattern="[0-9]{9}"
+                                                     value={achForm.routingNumber}
+                                                     onChange={(e) => setAchForm({...achForm, routingNumber: e.target.value.replace(/\D/g, '')})}
+                                                     className="w-full p-2 border border-slate-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                 />
+                                             </div>
+                                             <div>
+                                                 <label className="text-xs font-bold text-slate-500 uppercase">Account Number</label>
+                                                 <input 
+                                                     type="text" 
+                                                     required
+                                                     placeholder="Account number"
+                                                     value={achForm.accountNumber}
+                                                     onChange={(e) => setAchForm({...achForm, accountNumber: e.target.value.replace(/\D/g, '')})}
+                                                     className="w-full p-2 border border-slate-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                 />
+                                             </div>
+                                             <div>
+                                                 <label className="text-xs font-bold text-slate-500 uppercase">Account Type</label>
+                                                 <select 
+                                                     value={achForm.accountType}
+                                                     onChange={(e) => setAchForm({...achForm, accountType: e.target.value})}
+                                                     className="w-full p-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                 >
+                                                     <option value="checking">Checking</option>
+                                                     <option value="savings">Savings</option>
+                                                 </select>
+                                             </div>
+                                             <div className="flex gap-2 pt-2">
+                                                 <button 
+                                                     type="button"
+                                                     onClick={() => setShowACHForm(false)}
+                                                     className="flex-1 py-2 border border-slate-300 text-slate-600 rounded-lg text-sm font-bold hover:bg-slate-50"
+                                                 >
+                                                     Cancel
+                                                 </button>
+                                                 <button 
+                                                     type="submit"
+                                                     className="flex-1 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700"
+                                                 >
+                                                     Submit for Setup
+                                                 </button>
+                                             </div>
+                                             <p className="text-xs text-slate-400 text-center">Your bank info will be securely sent to admin for QBO setup.</p>
+                                         </form>
+                                     )}
                                  </div>
                              </div>
 
@@ -476,20 +569,28 @@ const MemberPortal: React.FC<MemberPortalProps> = ({
                          </div>
                      </div>
 
-                     {/* Right Sidebar: Saved Methods & Summary */}
+                     {/* Right Sidebar: Payment Status & Summary */}
                      <div className="space-y-6">
                          <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl shadow-lg text-white">
-                             <p className="text-xs text-slate-400 uppercase font-bold mb-4">Saved Methods</p>
-                             <div className="flex items-center gap-3 mb-4 p-3 bg-white/5 rounded-xl border border-white/10">
-                                 <div className="w-10 h-6 bg-slate-200 rounded flex items-center justify-center text-[8px] text-slate-800 font-bold">VISA</div>
-                                 <div>
-                                     <p className="text-sm font-medium">Chase Bank Checking</p>
-                                     <p className="text-xs text-slate-400">**** 4589</p>
+                             <p className="text-xs text-slate-400 uppercase font-bold mb-4">Payment Status</p>
+                             {achSubmitted ? (
+                                 <div className="p-3 bg-emerald-500/20 rounded-xl border border-emerald-500/30 mb-4">
+                                     <div className="flex items-center gap-2 text-emerald-400 mb-1">
+                                         <CheckCircle size={16}/>
+                                         <span className="text-sm font-bold">ACH Setup Pending</span>
+                                     </div>
+                                     <p className="text-xs text-slate-400">Admin will configure auto-debit in QuickBooks.</p>
                                  </div>
+                             ) : (
+                                 <div className="p-3 bg-white/5 rounded-xl border border-white/10 mb-4">
+                                     <p className="text-sm text-slate-300">No payment method linked yet.</p>
+                                     <p className="text-xs text-slate-500 mt-1">Setup ACH to enable auto-pay.</p>
+                                 </div>
+                             )}
+                             <div className="text-xs text-slate-500">
+                                 <p>Questions? Contact admin at:</p>
+                                 <p className="text-slate-300 font-medium">admin@millionairesclub.com</p>
                              </div>
-                             <button className="w-full py-2 bg-white/10 hover:bg-white/20 text-sm font-bold rounded-lg transition-colors flex items-center justify-center gap-2">
-                                 <Settings size={14}/> Manage Methods
-                             </button>
                          </div>
 
                          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
