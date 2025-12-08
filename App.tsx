@@ -17,6 +17,7 @@ import MembersListComponent from './components/MembersListComponent';
 import ContributionsComponent from './components/ContributionsComponent';
 import LoansComponent from './components/LoansComponent';
 import TransactionHistoryComponent from './components/TransactionHistoryComponent';
+import ReportsComponent from './components/ReportsComponent';
 
 const generateId = () => Math.random().toString(36).substr(2, 9);
 const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -806,15 +807,6 @@ export default function App() {
       );
   };
 
-  const ReportsComponent = () => (
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="font-bold text-lg mb-4">Loan vs Contribution Ratio</h3>
-          <div className="h-64 flex items-center justify-center bg-slate-50 rounded-xl text-slate-400">
-              Chart visualization (Recharts) would go here based on aggregated data.
-          </div>
-      </div>
-  );
-
   const SystemView = () => (
     <div className="space-y-6 animate-in fade-in">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1103,7 +1095,7 @@ export default function App() {
               {activeTab === 'contributions' && <ContributionsComponent members={members} setMembers={setMembers} transactions={transactions} setTransactions={setTransactions} notify={notify} />}
               {activeTab === 'loans' && <LoansComponent members={members} setMembers={setMembers} loans={loans} setLoans={setLoans} transactions={transactions} setTransactions={setTransactions} notify={notify} checkEligibility={checkEligibility} />}
               {activeTab === 'transactions' && <TransactionHistoryComponent members={members} transactions={transactions} />}
-              {activeTab === 'reports' && <ReportsComponent />}
+              {activeTab === 'reports' && <ReportsComponent members={members} loans={loans} transactions={transactions} />}
               {activeTab === 'system' && <SystemView />}
           </div>
       </main>

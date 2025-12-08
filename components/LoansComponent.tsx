@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Member, Loan, Transaction } from '../types';
-import { AlertCircle, CheckCircle, CreditCard, X, DollarSign, Clock, Calendar, Printer, History, Search, ChevronDown, Check, UserPlus, AlertTriangle, FileText, Wallet } from 'lucide-react';
+import { AlertCircle, CheckCircle, CreditCard, X, DollarSign, Clock, Calendar, Printer, History, Search, ChevronDown, Check, UserPlus, AlertTriangle, FileText, Wallet, FileSignature } from 'lucide-react';
 
 interface LoansProps {
   members: Member[];
@@ -19,6 +19,10 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
   const [loanAmount, setLoanAmount] = useState('');
   const [term, setTerm] = useState(12);
   const [feeType, setFeeType] = useState<'upfront' | 'capitalized'>('upfront');
+  
+  // Disbursal Details
+  const [disbursalMethod, setDisbursalMethod] = useState('Check');
+  const [issuedBy, setIssuedBy] = useState('Nangpi');
 
   // Searchable Dropdown State for Borrower
   const [borrowerSearch, setBorrowerSearch] = useState('');
@@ -155,7 +159,9 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
             type: 'LOAN_DISBURSAL' as const, 
             amount: requestedAmount, 
             date: new Date().toISOString(), 
-            description: 'Loan Disbursal' 
+            description: 'Loan Disbursal',
+            paymentMethod: disbursalMethod,
+            receivedBy: issuedBy
         },
         {
             id: Math.random().toString(36).substr(2, 9),
@@ -182,6 +188,7 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
     setCosignerSearch('');
     setLoanAmount('');
     setFeeType('upfront');
+    setDisbursalMethod('Check');
   };
 
   const handleRepaySubmit = (e: React.FormEvent) => {
@@ -281,6 +288,146 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
            : `Repayment recorded. Next due: ${new Date(updatedNextPaymentDue).toLocaleDateString()}`;
        notify(msg, isLate ? 'info' : 'success');
      }
+  };
+
+  // --- LOAN AGREEMENT PRINT LOGIC ---
+  const printLoanAgreement = (loan: Loan) => {
+      const borrower = members.find(m => m.id === loan.borrowerId);
+      const cosigner = members.find(m => m.id === loan.cosignerId);
+      
+      const issueDate = new Date(loan.startDate);
+      // First Payment: 10th of next month from issue
+      const firstPaymentDate = new Date(issueDate.getFullYear(), issueDate.getMonth() + 1, 10);
+      
+      // End Date: (Term - 1) months after first payment
+      const endDate = new Date(firstPaymentDate);
+      endDate.setMonth(endDate.getMonth() + (loan.termMonths - 1));
+
+      const monthlyPayment = loan.originalAmount / loan.termMonths;
+
+      const win = window.open('', '_blank', 'height=900,width=800');
+      if (!win) return;
+
+      win.document.write('<html><head><title>Loan Agreement</title>');
+      win.document.write('<script src="https://cdn.tailwindcss.com"></script>'); 
+      win.document.write(`
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Times+New+Roman&display=swap');
+          body { font-family: 'Times New Roman', serif; padding: 40px; color: #000; line-height: 1.6; }
+          @media print {
+            body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            @page { margin: 2cm; }
+            .no-print { display: none !important; }
+          }
+          .title { text-align: center; font-weight: bold; font-size: 24px; margin-bottom: 20px; text-decoration: underline; text-underline-offset: 4px; }
+          .header { text-align: center; margin-bottom: 40px; }
+          .company-name { font-size: 28px; font-weight: bold; color: #8B0000; text-transform: uppercase; letter-spacing: 1px; }
+          .sub-header { font-size: 14px; text-transform: uppercase; letter-spacing: 3px; color: #555; margin-top: 5px; margin-bottom: 5px; }
+          .email { color: #0066cc; text-decoration: underline; font-size: 14px; }
+          .section-title { font-weight: bold; text-decoration: underline; margin-top: 20px; margin-bottom: 10px; font-size: 18px; }
+          .field-line { border-bottom: 1px solid #000; display: inline-block; padding: 0 5px; font-weight: bold; }
+          .clause { margin-bottom: 15px; text-align: justify; }
+          .clause-label { font-weight: bold; margin-right: 5px; }
+          .signature-block { margin-top: 50px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+          .sig-line { border-top: 1px solid #000; margin-top: 5px; font-size: 14px; }
+          .highlight { background-color: yellow; padding: 0 2px; }
+          .footer { margin-top: 60px; font-size: 12px; color: #555; }
+          /* Editable field cue */
+          [contenteditable]:hover { background-color: #f0f9ff; cursor: text; outline: 1px dashed #bae6fd; }
+        </style>
+      `);
+      win.document.write('</head><body>');
+      
+      // Manual Print Button for Interaction
+      win.document.write(`
+        <div class="no-print" style="position: sticky; top: 0; background: white; padding: 15px; border-bottom: 1px solid #eee; text-align: right; z-index: 50; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="margin-bottom: 10px; font-size: 14px; color: #444; font-family: sans-serif;">
+                <strong>Instructions:</strong> Click on the address or names below to edit/fill them before printing.
+            </div>
+            <button onclick="window.print()" style="background-color: #2563eb; color: white; padding: 10px 20px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-family: sans-serif;">Print Agreement</button>
+        </div>
+      `);
+      
+      win.document.write(`
+        <div class="header">
+            <div class="company-name">Millionaires Club</div>
+            <div class="sub-header">Financial Services</div>
+            <div class="email">info.millionaresclubusa@gmail.com</div>
+        </div>
+
+        <div class="title">LOAN AGREEMENT</div>
+
+        <div class="flex justify-between mb-6">
+            <div class="font-bold text-xl">$ <span class="underline">${loan.originalAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+            <div class="font-bold">Date: <span class="underline">${issueDate.toLocaleDateString()}</span></div>
+        </div>
+
+        <p class="mb-6">
+            For above value received by <span class="field-line min-w-[200px] text-center">${borrower?.name}</span> with a mailing address of 
+            <span class="field-line min-w-[300px]" contenteditable="true">${borrower?.address || '______________________________________'}</span>, 
+            City of <span class="field-line min-w-[100px]">Tulsa</span>, 
+            State of <span class="field-line min-w-[100px]">OK</span>, 
+            agrees to pay <strong>Millionaires Club</strong> with no interest.
+        </p>
+
+        <div class="section-title">TERM OF REPAYMENT</div>
+
+        <div class="clause">
+            <span class="clause-label">A. Payment:</span> The unpaid principal shall be payable in monthly installments of 
+            <strong>$${monthlyPayment.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong>, 
+            beginning on <strong>${firstPaymentDate.toLocaleDateString()}</strong> 
+            and ending on <strong>${endDate.toLocaleDateString()}</strong>, 
+            at this time the remaining unpaid balance shall be due in full.
+        </div>
+
+        <div class="clause">
+            <span class="clause-label">B. Late Fee:</span> The borrower agrees to pay a late charge of 
+            <strong>$5.00</strong> for each installment that remains unpaid more than 15 days after its Due Date.
+        </div>
+
+        <div class="clause">
+            <span class="clause-label">C. Prepayment:</span> The borrower has the right to pay back the loan in full or make additional payments at any time with no penalty.
+        </div>
+
+        <div class="signature-block">
+            <div>
+                <div class="mb-8 font-bold text-lg outline-none" contenteditable="true">Millionaires Club</div>
+                <div class="sig-line">Lender's Name</div>
+            </div>
+            <div>
+                <div class="mb-8 font-bold text-lg">&nbsp;</div>
+                <div class="sig-line">Lender's Signature</div>
+            </div>
+
+            <div>
+                <div class="mb-8 font-bold text-lg">${borrower?.name}</div>
+                <div class="sig-line">Borrower's Name</div>
+            </div>
+            <div>
+                <div class="mb-8 font-bold text-lg">&nbsp;</div>
+                <div class="sig-line">Borrower's Signature</div>
+            </div>
+
+            <div>
+                <div class="mb-8 font-bold text-lg"><span class="highlight">${cosigner?.name}</span></div>
+                <div class="sig-line"><span class="highlight">Cosigner</span>'s Name</div>
+            </div>
+            <div>
+                <div class="mb-8 font-bold text-lg">&nbsp;</div>
+                <div class="sig-line">Cosigner's Signature</div>
+            </div>
+        </div>
+
+        <div class="mt-8 bg-yellow-100 p-2 text-sm border border-yellow-300 inline-block">
+            <strong>¹</strong> A person who signs a loan application agreeing to guarantee payment if the signer is unable to repay the loan.
+        </div>
+
+        <div class="footer">©${new Date().getFullYear()} MC-BOD</div>
+      `);
+
+      win.document.write('</body></html>');
+      win.document.close();
+      // Removed automatic print to allow editing
   };
 
   // Schedule Logic
@@ -681,6 +828,37 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
               </select>
             </div>
 
+            {/* Disbursal Details */}
+            <div className="grid grid-cols-2 gap-3">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Disbursal Method</label>
+                    <select 
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        value={disbursalMethod}
+                        onChange={(e) => setDisbursalMethod(e.target.value)}
+                    >
+                        <option value="Check">Check</option>
+                        <option value="Bank Transfer">Bank Transfer</option>
+                        <option value="Zelle">Zelle</option>
+                        <option value="Cash">Cash</option>
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Issued By</label>
+                    <select 
+                        className="w-full p-3 border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        value={issuedBy}
+                        onChange={(e) => setIssuedBy(e.target.value)}
+                    >
+                        <option value="Nangpi">Nangpi</option>
+                        <option value="Pu Tuang">Pu Tuang</option>
+                        <option value="Mangpi">Mangpi</option>
+                        <option value="Muan">Muan</option>
+                        <option value="John Tuang">John Tuang</option>
+                    </select>
+                </div>
+            </div>
+
             {loanAmount && !isNaN(parseFloat(loanAmount)) && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                     <div className="flex justify-between items-center text-sm mb-2">
@@ -810,6 +988,13 @@ const LoansComponent: React.FC<LoansProps> = ({ members, setMembers, loans, setL
                     <p className="text-xs text-slate-400">of ${loan.originalAmount.toLocaleString()}</p>
                  </div>
                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => printLoanAgreement(loan)}
+                      className="px-3 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
+                      title="Print Loan Agreement"
+                    >
+                      <FileSignature size={14} /> Contract
+                    </button>
                     <button 
                       onClick={() => setScheduleLoan(loan)}
                       className="px-4 py-2 bg-blue-50 text-blue-700 border border-blue-100 rounded-lg text-sm font-bold hover:bg-blue-100 transition-colors flex items-center gap-2"
