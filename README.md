@@ -1,4 +1,4 @@
-# Millionaires Club Fund CRM
+# Millionaires Club Fund
 
 A modern, cloud-based CRM application for managing a community fund with **multi-user authentication** and **real-time sync**, built with React, TypeScript, Supabase, and Google's Gemini AI.
 
